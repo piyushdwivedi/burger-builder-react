@@ -13,11 +13,16 @@ class ContactData extends Component {
                 type,
                 placeholder
             },
-            value: ''
+            value: '',
+            validation: {
+                required: true,
+                valid: false
+            },
+            touched: false
         }
     }
     state = {
-        oderForm: {
+        orderForm: {
             name: this.getConfigObject('input', 'text', 'Your Name'),
             street: this.getConfigObject('input', 'text', 'Your Address'),
             zipCode: this.getConfigObject('input', 'text', 'Your Zipcode'),
@@ -37,10 +42,14 @@ class ContactData extends Component {
                         }
                     ]
                 },
-                value: ''
+                value: '',
+                validation: {
+                    valid: true
+                }
             }
         },
-        loading: false
+        loading: false,
+        formIsValid: false
     }
     
     orderSubmitted = (event) => {
@@ -48,9 +57,14 @@ class ContactData extends Component {
         this.setState({
             loading: true
         });
+        let formData = {};
+        for(let formEle in this.state.orderForm) {
+            formData[formEle] = this.state.orderForm[formEle].value 
+        }
         const order = {
             ingredients: this.props.ingredients,
-            price: this.props.price
+            price: this.props.price,
+            orderData: formData
         }
         axios.post('/orders.json', order)
              .then(response => {
@@ -69,35 +83,59 @@ class ContactData extends Component {
                 })
         })
     }
-    inputChanged = (event, input) => {
-        let updatedForm = {...this.state.orderForm};
-        let formEle = {...updatedForm[input]};
-        formEle.value = event.target.value; 
-        updatedForm[input] = formEle;
+    inputChanged = (event, inputIdentifier) => {
+        let updatedForm = {
+            ...this.state.orderForm
+        };
+        let formEle = {
+            ...updatedForm[inputIdentifier]
+        };
+        formEle.value = event.target.value;
+        formEle.touched = true;
+        this.validateFields(formEle.value, formEle.validation); 
+        updatedForm[inputIdentifier] = formEle;
+        console.log(updatedForm);
+        let formValid = true;
+        for(let i in updatedForm) {
+            formValid = updatedForm[i].validation.valid && formValid;
+        }
         this.setState({
-            orderForm: updatedForm
+            orderForm: updatedForm,
+            formIsValid: formValid
         })
+    }
+
+    validateFields = (val, rules) => {
+        let isValidVal = false;
+        if(rules.required) {
+            isValidVal = val.trim() !== '';
+        }
+        rules.valid = isValidVal;
     }
     render() {
         let formElementsList = [];
-        for(let key in this.state.oderForm) {
+        for(let key in this.state.orderForm) {
             formElementsList.push({
                 id: key,
-                config: this.state.oderForm[key]
+                config: this.state.orderForm[key]
             })
         }
+    
         let form = ( 
-        <form>
-            {formElementsList.map(ele => (
+        <form onSubmit={this.orderSubmitted}>
+            {formElementsList.map(ele => ( 
                 <Input 
                     key={ele.id}
                     type={ele.config.elementType}
                     config={ele.config.config}
                     value={ele.value}
+                    changedVal={ele.config.touched}
+                    shouldValidate={ele.config.validation}
+                    invalid={ele.config.validation && !ele.config.validation.valid}
                     changed={(event) => this.inputChanged(event, ele.id)}
                 />
             ))}
-            <Button btnType="Success" clicked={this.orderSubmitted}>ORDER</Button>
+            <Button btnType="Success" disabled={!this.state.formIsValid}>ORDER</Button>
         </form>);
         if(this.state.loading) {
             form = <Spinner />;
